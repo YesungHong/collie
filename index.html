@@ -1,0 +1,516 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="robots" content="noindex">
+<title>Collie</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐕</text></svg>">
+<style>
+:root{
+  --bg:#f6f3ee; --surface:#fffdf9; --ink:#1f1d1a; --muted:#7a746b; --line:#e4ded4;
+  --accent:#3b6f63; --accent-ink:#fff; --soft:#e7efe9; --warn:#a0703a;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#171614; --surface:#22201d; --ink:#ece7df; --muted:#9a9388; --line:#35322d;
+    --accent:#7fb8a8; --accent-ink:#11201c; --soft:#24302c; --warn:#d4a46c;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#171614; --surface:#22201d; --ink:#ece7df; --muted:#9a9388; --line:#35322d;
+  --accent:#7fb8a8; --accent-ink:#11201c; --soft:#24302c; --warn:#d4a46c;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",sans-serif;
+  -webkit-text-size-adjust:100%}
+body{min-height:100vh;padding-bottom:calc(64px + env(safe-area-inset-bottom))}
+.wrap{max-width:480px;margin:0 auto;padding:12px 16px 24px}
+header{display:flex;align-items:center;justify-content:space-between;padding:6px 0 10px}
+header h1{font-size:19px;margin:0;font-weight:700;letter-spacing:-.2px}
+.sync{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--muted)}
+.dot.ok{background:var(--accent)} .dot.wait{background:var(--warn)}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;padding:0}
+.icon{font-size:20px;padding:4px 6px;color:var(--muted)}
+select,input,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);
+  border-radius:10px;padding:10px 12px;width:100%;font-size:16px}
+textarea{resize:vertical;min-height:72px;line-height:1.45}
+.row{display:flex;gap:8px;align-items:center}
+.picker{display:flex;gap:8px;margin-bottom:12px}
+.picker select{flex:1}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:20px 18px;margin-bottom:12px}
+.label{font-size:12px;color:var(--muted);letter-spacing:.3px;margin-bottom:10px}
+.piece{font-size:24px;line-height:1.35;font-weight:600;word-break:keep-all;overflow-wrap:anywhere;min-height:2.7em}
+.timer{font-variant-numeric:tabular-nums;font-size:40px;font-weight:300;text-align:center;margin:18px 0 6px;color:var(--muted)}
+.timer.run{color:var(--accent)}
+.timer.over{color:var(--warn)}
+.btns{display:flex;gap:10px;margin-top:12px}
+.btn{flex:1;border-radius:12px;padding:14px 10px;font-size:16px;font-weight:600;border:1px solid var(--line);background:var(--surface)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.links{text-align:center;margin-top:14px;font-size:13px;color:var(--muted)}
+.links button{color:var(--muted);text-decoration:underline;text-underline-offset:3px;padding:4px 6px}
+.count{text-align:center;color:var(--muted);font-size:14px;margin-top:6px}
+.count b{color:var(--ink);font-size:18px;margin-left:4px}
+.hint{font-size:13px;color:var(--muted);margin:6px 2px 12px;line-height:1.5}
+.stack>*+*{margin-top:10px}
+h2{font-size:16px;margin:4px 0 12px}
+.day{margin-bottom:20px}
+.day h3{font-size:13px;color:var(--muted);margin:0 0 8px;font-weight:600}
+.item{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:8px;font-size:15px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere}
+.item small{display:block;color:var(--muted);font-size:12px;margin-bottom:3px;white-space:normal}
+.empty{color:var(--muted);text-align:center;padding:40px 10px;line-height:1.6}
+nav{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);
+  padding-bottom:env(safe-area-inset-bottom)}
+nav .in{max-width:480px;margin:0 auto;display:flex}
+nav button{flex:1;padding:16px 0;font-size:15px;color:var(--muted)}
+nav button.on{color:var(--ink);font-weight:700}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(80px + env(safe-area-inset-bottom));
+  background:var(--ink);color:var(--bg);border-radius:12px;padding:11px 16px;font-size:14px;display:flex;gap:14px;align-items:center;
+  max-width:calc(100% - 32px);z-index:5}
+.toast button{color:var(--bg);text-decoration:underline;font-weight:600}
+.menu{background:var(--surface);border:1px solid var(--line);border-radius:12px;margin:-4px 0 12px;overflow:hidden}
+.menu button{display:block;width:100%;text-align:left;padding:13px 14px;border-bottom:1px solid var(--line);font-size:15px}
+.menu button:last-child{border-bottom:0}
+.menu .danger{color:var(--warn)}
+code{font-size:13px;background:var(--soft);padding:1px 5px;border-radius:5px}
+ol{padding-left:20px;line-height:1.7;font-size:14px;margin:6px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Collie 🐕</h1>
+    <div class="row">
+      <span class="sync" id="sync"></span>
+      <button class="icon" id="gear" aria-label="설정">⚙</button>
+    </div>
+  </header>
+  <main id="main"></main>
+</div>
+<nav><div class="in">
+  <button data-tab="do">할 일</button>
+  <button data-tab="memo">메모</button>
+  <button data-tab="log">기록</button>
+</div></nav>
+<div id="toast"></div>
+
+<script>
+'use strict';
+// ---------- constants ----------
+const REPO = 'YesungHong/collie-data';
+const FILE = 'data.json';
+const API  = `https://api.github.com/repos/${REPO}/contents/${FILE}`;
+const PIECE_SEC = 300;                       // one piece = 5 minutes
+const EMPTY = () => ({version:1, tasks:[], notes:[]});
+
+// ---------- storage (never throws) ----------
+const store = {
+  get(k, d){ try{ const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); }catch(e){ return d; } },
+  set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} },
+};
+
+// ---------- time ----------
+function pad(n){ return String(n).padStart(2,'0'); }
+function nowIso(){
+  const d = new Date(), off = -d.getTimezoneOffset(), s = off >= 0 ? '+' : '-', a = Math.abs(off);
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}${s}${pad(a/60|0)}:${pad(a%60)}`;
+}
+const dayOf  = iso => (iso || '').slice(0,10);
+const timeOf = iso => (iso || '').slice(11,16);
+const today  = () => dayOf(nowIso());
+const uid = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+
+// ---------- data model: ops applied on top of the last pulled copy ----------
+// Every op is idempotent, so re-applying after a lost PUT response is harmless.
+function clone(o){ return JSON.parse(JSON.stringify(o)); }
+function findTask(d, id){ return d.tasks.find(t => t.id === id); }
+function apply(d, op){
+  const t = op.task_id ? findTask(d, op.task_id) : null;
+  switch(op.t){
+    case 'addTask':
+      if(!findTask(d, op.id)) d.tasks.push({id:op.id, title:op.title, created:op.at, status:'active', pieces:[], wrap:null});
+      break;
+    case 'addPieces':
+      if(t) for(const p of op.pieces)
+        if(!t.pieces.some(x => x.id === p.id)) t.pieces.push({id:p.id, text:p.text, status:'todo', done_at:null, note:null});
+      if(t && t.status === 'done' && op.pieces.length){ t.status = 'active'; }
+      break;
+    case 'done': {
+      const p = t && t.pieces.find(x => x.id === op.piece_id);
+      if(p){ p.status = 'done'; p.done_at = op.at; if(op.note) p.note = op.note; }
+      break; }
+    case 'reopen': {
+      const p = t && t.pieces.find(x => x.id === op.piece_id);
+      if(p){ p.status = 'todo'; p.done_at = null; p.note = null; }
+      break; }
+    case 'split': {
+      const i = t ? t.pieces.findIndex(x => x.id === op.piece_id && x.status === 'todo') : -1;
+      if(i >= 0) t.pieces.splice(i, 1, ...op.parts.map(p => ({id:p.id, text:p.text, status:'todo', done_at:null, note:null})));
+      break; }
+    case 'skip': {
+      const i = t ? t.pieces.findIndex(x => x.id === op.piece_id && x.status === 'todo') : -1;
+      if(i >= 0) t.pieces.push(t.pieces.splice(i, 1)[0]);
+      break; }
+    case 'finish':
+      if(t){ t.status = 'done'; t.wrap = op.text ? {at:op.at, text:op.text} : null; t.finished = op.at; }
+      break;
+    case 'note':
+      if(!d.notes.some(n => n.id === op.id)) d.notes.push({id:op.id, at:op.at, text:op.text, task_id:op.task_id || null});
+      break;
+    case 'delTask':
+      d.tasks = d.tasks.filter(x => x.id !== op.task_id);
+      break;
+  }
+  return d;
+}
+function applyAll(data, ops){ return ops.reduce(apply, clone(data)); }
+
+let base = store.get('collie.base', {data:EMPTY(), sha:null, at:null});
+let ops  = store.get('collie.ops', []);
+let D    = applyAll(base.data, ops);
+
+function commit(op){
+  op.at = op.at || nowIso();
+  ops.push(op); store.set('collie.ops', ops);
+  D = applyAll(base.data, ops);
+  render(); scheduleSync();
+}
+
+// ---------- GitHub sync ----------
+const token = () => store.get('collie.token', '');
+let syncing = false, syncErr = '', syncTimer = null;
+
+function b64encode(str){
+  const bytes = new TextEncoder().encode(str); let bin = '';
+  for(let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+function b64decode(b64){
+  const bin = atob(b64.replace(/\s/g, '')), bytes = new Uint8Array(bin.length);
+  for(let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new TextDecoder().decode(bytes);
+}
+function headers(){
+  return {'Authorization':'Bearer ' + token(), 'Accept':'application/vnd.github+json', 'X-GitHub-Api-Version':'2022-11-28'};
+}
+async function getRemote(){
+  const r = await fetch(API + '?ref=main&t=' + Date.now(), {headers:headers(), cache:'no-store'});
+  if(r.status === 404) return {data:EMPTY(), sha:null};
+  if(!r.ok) throw httpErr(r.status);
+  const j = await r.json();
+  const data = JSON.parse(b64decode(j.content));
+  data.tasks = data.tasks || []; data.notes = data.notes || [];
+  return {data, sha:j.sha};
+}
+async function putRemote(data, sha, n){
+  const body = {message:`collie app: ${n} change${n > 1 ? 's' : ''}`, content:b64encode(JSON.stringify(data, null, 2) + '\n'), branch:'main'};
+  if(sha) body.sha = sha;
+  const r = await fetch(API, {method:'PUT', headers:headers(), body:JSON.stringify(body)});
+  if(r.status === 409 || r.status === 422) return null;          // someone else wrote first → retry
+  if(!r.ok) throw httpErr(r.status);
+  return (await r.json()).content.sha;
+}
+function httpErr(s){
+  const e = new Error('http ' + s); e.status = s; return e;
+}
+function scheduleSync(ms){
+  clearTimeout(syncTimer); syncTimer = setTimeout(sync, ms == null ? 1200 : ms);
+}
+async function sync(){
+  if(!token() || syncing) { renderSync(); return; }
+  syncing = true; renderSync();
+  try{
+    for(let attempt = 0; attempt < 4; attempt++){
+      const remote = await getRemote();
+      const n = ops.length;
+      if(n === 0){ base = {data:remote.data, sha:remote.sha, at:nowIso()}; break; }
+      const merged = applyAll(remote.data, ops.slice(0, n));
+      const sha = await putRemote(merged, remote.sha, n);
+      if(sha){ base = {data:merged, sha, at:nowIso()}; ops = ops.slice(n); break; }
+    }
+    store.set('collie.base', base); store.set('collie.ops', ops);
+    D = applyAll(base.data, ops);
+    syncErr = '';
+  }catch(e){
+    syncErr = e.status === 401 || e.status === 403 ? 'token' : 'offline';
+  }
+  syncing = false;
+  render();
+  if(ops.length && !syncErr) scheduleSync(500);
+}
+window.addEventListener('online', () => scheduleSync(0));
+document.addEventListener('visibilitychange', () => { if(!document.hidden) scheduleSync(0); });
+
+// ---------- UI state (per phone, not synced) ----------
+let tab = 'do';
+let ui = {mode:null, menu:false};                 // mode: null | 'new' | 'add' | 'split' | 'settings'
+let undoTimer = null;
+
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const $ = id => document.getElementById(id);
+const active = () => D.tasks.filter(t => t.status === 'active');
+function curTask(){
+  const list = active(), id = store.get('collie.cur', null);
+  return list.find(t => t.id === id) || list[0] || null;
+}
+const nextPiece = t => t ? t.pieces.find(p => p.status === 'todo') || null : null;
+const doneToday = () => D.tasks.reduce((n, t) => n + t.pieces.filter(p => p.status === 'done' && dayOf(p.done_at) === today()).length, 0);
+
+// timer = {piece_id, t0}; local only
+const getTimer = () => store.get('collie.timer', null);
+function timerText(p){
+  const tm = getTimer();
+  if(!tm || tm.piece_id !== p.id) return {txt:'5:00', cls:''};
+  const s = Math.floor((Date.now() - tm.t0) / 1000), left = PIECE_SEC - s;
+  if(left >= 0) return {txt:`${left/60|0}:${pad(left%60)}`, cls:'run'};
+  const o = -left; return {txt:`+${o/60|0}:${pad(o%60)}`, cls:'over'};
+}
+
+// keep typed text across re-renders (sync finishing must not eat a half-written note)
+function keepInputs(fn){
+  const kept = {}, f = document.activeElement && document.activeElement.id;
+  document.querySelectorAll('[data-keep]').forEach(el => kept[el.id] = el.value);
+  fn();
+  for(const id in kept){ const el = $(id); if(el && !el.value) el.value = kept[id]; }
+  if(f && $(f)) $(f).focus();
+}
+
+// ---------- render ----------
+function render(){
+  keepInputs(() => {
+    $('main').innerHTML = ui.mode === 'settings' ? viewSettings() : tab === 'do' ? viewDo() : tab === 'memo' ? viewMemo() : viewLog();
+  });
+  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === tab && ui.mode !== 'settings'));
+  renderSync();
+}
+function renderSync(){
+  let cls = '', txt;
+  if(!token()) { txt = '이 폰에만 저장'; cls = 'wait'; }
+  else if(syncing) txt = '저장 중…';
+  else if(syncErr === 'token') { txt = '토큰 확인 필요'; cls = 'wait'; }
+  else if(syncErr) { txt = `오프라인 · 대기 ${ops.length}`; cls = 'wait'; }
+  else if(ops.length) { txt = `대기 ${ops.length}`; cls = 'wait'; }
+  else { txt = base.at ? `저장됨 ${timeOf(base.at)}` : '저장됨'; cls = 'ok'; }
+  $('sync').innerHTML = `<span class="dot ${cls}"></span>${esc(txt)}`;
+}
+
+function viewDo(){
+  if(ui.mode === 'new') return viewNew();
+  const list = active(), t = curTask();
+  if(!t) return `
+    <div class="empty">지금 쪼개둔 일이 없어요.<br>PC에서 <code>/collie</code>랑 같이 쪼개거나,<br>여기서 바로 적어도 돼요.</div>
+    <button class="btn primary" style="width:100%" data-act="new">+ 새 일</button>
+    ${countLine()}`;
+  const opts = list.map(x => `<option value="${esc(x.id)}" ${x.id === t.id ? 'selected' : ''}>${esc(x.title)}</option>`).join('')
+             + `<option value="__new">+ 새 일</option>`;
+  let h = `<div class="picker"><select id="pick" aria-label="하던 일">${opts}</select>
+           <button class="icon" data-act="menu" aria-label="이 일 메뉴">⋯</button></div>`;
+  if(ui.menu) h += `<div class="menu">
+      <button data-act="add">조각 추가</button>
+      <button data-act="finishNow">이 일 끝내기</button>
+      <button class="danger" data-act="del">이 일 지우기</button></div>`;
+  if(ui.mode === 'add') return h + `<div class="card stack">
+      <div class="label">조각 추가 · 한 줄에 하나</div>
+      <textarea id="addTxt" data-keep rows="4" placeholder="노트 열기&#10;3번 문제만 풀기"></textarea>
+      <div class="btns"><button class="btn" data-act="cancel">취소</button><button class="btn primary" data-act="addGo">추가</button></div></div>`;
+  const p = nextPiece(t);
+  if(!p) return h + `<div class="card stack">
+      <div class="label">마지막 조각까지 끝</div>
+      <div class="piece" style="min-height:0">${esc(t.title)}</div>
+      <textarea id="wrapTxt" data-keep rows="3" placeholder="끝나고 한 줄? (안 써도 돼요)"></textarea>
+      <div class="btns"><button class="btn" data-act="wrapSkip">그냥 끝내기</button><button class="btn primary" data-act="wrapGo">남기기</button></div>
+      <div class="links"><button data-act="add">조각 더 추가</button></div></div>${countLine()}`;
+  if(ui.mode === 'split') return h + `<div class="card stack">
+      <div class="label">둘로 나누기</div>
+      <input id="sp1" data-keep value="${esc(p.text)}" aria-label="먼저 할 것">
+      <input id="sp2" data-keep placeholder="그다음 할 것" aria-label="그다음 할 것">
+      <div class="btns"><button class="btn" data-act="cancel">취소</button><button class="btn primary" data-act="splitGo">나누기</button></div></div>`;
+  const tm = timerText(p), running = getTimer() && getTimer().piece_id === p.id;
+  return h + `<div class="card">
+      <div class="label">지금 할 거</div>
+      <div class="piece">${esc(p.text)}</div>
+      <div class="timer ${tm.cls}" id="timer">${tm.txt}</div>
+      <input id="pnote" data-keep placeholder="메모 (선택)" aria-label="메모">
+      <div class="btns">
+        <button class="btn" data-act="${running ? 'stop' : 'start'}">${running ? '■ 멈춤' : '▶ 시작'}</button>
+        <button class="btn primary" data-act="done">✓ 끝</button>
+      </div>
+      <div class="links"><button data-act="split">쪼개기</button>·<button data-act="skip">건너뛰기</button></div>
+    </div>${countLine()}`;
+}
+const countLine = () => `<div class="count">오늘 끝낸 조각<b>${doneToday()}</b></div>`;
+
+function viewNew(){
+  return `<div class="card stack">
+    <div class="label">새 일</div>
+    <input id="newTitle" data-keep placeholder="무슨 일? (예: 반도체 2장 읽기)">
+    <textarea id="newPieces" data-keep rows="5" placeholder="5분 조각, 한 줄에 하나&#10;PDF 열기&#10;첫 페이지만 읽기"></textarea>
+    <div class="hint">첫 조각은 제일 작게. 파일 여는 것도 한 조각이에요.</div>
+    <div class="btns"><button class="btn" data-act="cancel">취소</button><button class="btn primary" data-act="newGo">만들기</button></div></div>`;
+}
+
+function viewMemo(){
+  const recent = D.notes.filter(n => !n.task_id).slice().sort((a,b) => b.at.localeCompare(a.at)).slice(0, 10);
+  return `<h2>메모</h2>
+    <textarea id="memoTxt" data-keep rows="4" placeholder="떠오른 생각, 아무거나"></textarea>
+    <div class="btns" style="margin-bottom:20px"><button class="btn primary" data-act="memoGo">남기기</button></div>
+    ${recent.map(n => `<div class="item"><small>${esc(dayOf(n.at).slice(5).replace('-','/'))} ${esc(timeOf(n.at))}</small>${esc(n.text)}</div>`).join('')}`;
+}
+
+function viewLog(){
+  const days = {};
+  const at = (k) => days[k] = days[k] || {pieces:0, items:[]};
+  for(const t of D.tasks){
+    for(const p of t.pieces) if(p.status === 'done'){
+      at(dayOf(p.done_at)).pieces++;
+      if(p.note) at(dayOf(p.done_at)).items.push({at:p.done_at, head:`${t.title} · ${p.text}`, body:p.note});
+    }
+    if(t.status === 'done'){
+      const when = t.wrap ? t.wrap.at : (t.finished || lastDone(t));
+      if(when) at(dayOf(when)).items.push({at:when, head:`✓ ${t.title} · 조각 ${t.pieces.filter(p => p.status === 'done').length}`, body:t.wrap ? t.wrap.text : ''});
+    }
+  }
+  for(const n of D.notes) at(dayOf(n.at)).items.push({at:n.at, head:'메모', body:n.text});
+  const keys = Object.keys(days).filter(Boolean).sort().reverse();
+  if(!keys.length) return `<h2>기록</h2><div class="empty">끝낸 조각과 메모가 여기 날짜별로 쌓여요.</div>`;
+  return `<h2>기록</h2>` + keys.map(k => {
+    const d = days[k];
+    const items = d.items.sort((a,b) => b.at.localeCompare(a.at)).map(i =>
+      `<div class="item"><small>${esc(timeOf(i.at))} · ${esc(i.head)}</small>${esc(i.body)}</div>`).join('');
+    return `<div class="day"><h3>${esc(k.slice(5).replace('-','/'))} · 끝낸 조각 ${d.pieces}</h3>${items}</div>`;
+  }).join('');
+}
+function lastDone(t){ return t.pieces.map(p => p.done_at).filter(Boolean).sort().pop(); }
+
+function viewSettings(){
+  return `<h2>설정</h2>
+    <div class="card stack">
+      <div class="label">GitHub 토큰 · 이 폰에만 저장돼요</div>
+      <input id="tok" type="password" autocomplete="off" placeholder="github_pat_…" value="${esc(token())}">
+      <div class="btns"><button class="btn" data-act="closeSet">닫기</button><button class="btn primary" data-act="tokGo">저장하고 연결</button></div>
+      <div class="hint" id="tokMsg">${token() ? (syncErr === 'token' ? '토큰이 안 맞아요. 다시 확인해 주세요.' : syncErr ? '지금은 연결이 안 돼요. 적은 건 폰에 들고 있다가 올라가요.' : '연결됨 · ' + esc(REPO)) : '토큰이 없으면 이 폰에만 저장돼요.'}</div>
+    </div>
+    <div class="card">
+      <div class="label">토큰 만드는 법</div>
+      <ol>
+        <li>GitHub → Settings → Developer settings</li>
+        <li>Personal access tokens → <b>Fine-grained tokens</b> → Generate</li>
+        <li>Repository access: <b>Only select</b> → <code>collie-data</code></li>
+        <li>Permissions → Contents: <b>Read and write</b></li>
+      </ol>
+      <div class="hint">이 저장소 하나만 만질 수 있는 토큰이라, 다른 저장소는 못 건드려요.</div>
+    </div>`;
+}
+
+// ---------- toast ----------
+function toast(msg, actLabel, act){
+  clearTimeout(undoTimer);
+  $('toast').innerHTML = `<div class="toast"><span>${esc(msg)}</span>${actLabel ? `<button data-act="${act}">${esc(actLabel)}</button>` : ''}</div>`;
+  undoTimer = setTimeout(() => $('toast').innerHTML = '', 5000);
+}
+
+// ---------- actions ----------
+let lastDoneRef = null;
+function lines(s){ return s.split('\n').map(x => x.trim()).filter(Boolean); }
+const val = id => ($(id) ? $(id).value.trim() : '');
+function clearKeep(...ids){ ids.forEach(id => { if($(id)) $(id).value = ''; }); }
+
+document.addEventListener('click', e => {
+  const tb = e.target.closest('nav button');
+  if(tb){ tab = tb.dataset.tab; ui = {mode:null, menu:false}; render(); window.scrollTo(0,0); return; }
+  if(e.target.closest('#gear')){ ui = {mode: ui.mode === 'settings' ? null : 'settings', menu:false}; render(); return; }
+  const b = e.target.closest('[data-act]'); if(!b) return;
+  const t = curTask(), p = nextPiece(t);
+  switch(b.dataset.act){
+    case 'new': ui = {mode:'new', menu:false}; render(); break;
+    case 'cancel': clearKeep('addTxt','sp1','sp2','newTitle','newPieces'); ui = {mode:null, menu:false}; render(); break;
+    case 'menu': ui.menu = !ui.menu; render(); break;
+    case 'newGo': {
+      const title = val('newTitle'); if(!title){ $('newTitle').focus(); return; }
+      let ps = lines($('newPieces').value); if(!ps.length) ps = [`'${title}' 자료 열기`];
+      const id = uid('t');
+      clearKeep('newTitle','newPieces');
+      store.set('collie.cur', id); ui = {mode:null, menu:false};
+      commit({t:'addTask', id, title});
+      commit({t:'addPieces', task_id:id, pieces:ps.map(text => ({id:uid('p'), text}))});
+      break; }
+    case 'add': ui = {mode:'add', menu:false}; render(); break;
+    case 'addGo': {
+      const ps = lines($('addTxt').value); if(!ps.length) return;
+      clearKeep('addTxt'); ui = {mode:null, menu:false};
+      commit({t:'addPieces', task_id:t.id, pieces:ps.map(text => ({id:uid('p'), text}))});
+      break; }
+    case 'start': store.set('collie.timer', {piece_id:p.id, t0:Date.now()}); render(); break;
+    case 'stop':  store.set('collie.timer', null); render(); break;
+    case 'done': {
+      const note = val('pnote'); clearKeep('pnote');
+      store.set('collie.timer', null);
+      lastDoneRef = {task_id:t.id, piece_id:p.id};
+      commit({t:'done', task_id:t.id, piece_id:p.id, note: note || null});
+      toast('끝!', '되돌리기', 'undo');
+      break; }
+    case 'undo':
+      if(lastDoneRef){ commit({t:'reopen', ...lastDoneRef}); lastDoneRef = null; }
+      $('toast').innerHTML = ''; break;
+    case 'split': ui = {mode:'split', menu:false}; render(); break;
+    case 'splitGo': {
+      const a = val('sp1'), c = val('sp2'); if(!a) return;
+      const parts = [{id:uid('p'), text:a}]; if(c) parts.push({id:uid('p'), text:c});
+      clearKeep('sp1','sp2'); ui = {mode:null, menu:false};
+      if(getTimer() && getTimer().piece_id === p.id) store.set('collie.timer', null);
+      commit({t:'split', task_id:t.id, piece_id:p.id, parts});
+      break; }
+    case 'skip':
+      if(getTimer() && getTimer().piece_id === p.id) store.set('collie.timer', null);
+      commit({t:'skip', task_id:t.id, piece_id:p.id}); break;
+    case 'wrapGo': case 'wrapSkip': {
+      const text = b.dataset.act === 'wrapGo' ? val('wrapTxt') : '';
+      clearKeep('wrapTxt');
+      commit({t:'finish', task_id:t.id, text: text || null});
+      toast(`✓ ${t.title}`); break; }
+    case 'finishNow':
+      ui = {mode:null, menu:false};
+      commit({t:'finish', task_id:t.id, text:null});
+      toast(`✓ ${t.title}`); break;
+    case 'del':
+      ui.menu = false;
+      if(confirm(`'${t.title}'을(를) 지울까요? 기록에서도 사라져요.`)) commit({t:'delTask', task_id:t.id});
+      else render();
+      break;
+    case 'memoGo': {
+      const text = val('memoTxt'); if(!text) return;
+      clearKeep('memoTxt');
+      commit({t:'note', id:uid('n'), text, task_id:null});
+      toast('남겼어요'); break; }
+    case 'tokGo':
+      store.set('collie.token', val('tok'));
+      $('tokMsg').textContent = '연결 중…';
+      syncErr = ''; sync().then(() => { if(ui.mode === 'settings') render(); });
+      break;
+    case 'closeSet': ui = {mode:null, menu:false}; render(); break;
+  }
+});
+document.addEventListener('change', e => {
+  if(e.target.id !== 'pick') return;
+  if(e.target.value === '__new'){ ui = {mode:'new', menu:false}; }
+  else { store.set('collie.cur', e.target.value); ui = {mode:null, menu:false}; }
+  render();
+});
+
+// timer: swap the text only, once a second
+setInterval(() => {
+  const el = $('timer'); if(!el) return;
+  const p = nextPiece(curTask()); if(!p) return;
+  const tm = timerText(p); el.textContent = tm.txt; el.className = 'timer ' + tm.cls;
+}, 1000);
+
+if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+render();
+scheduleSync(0);
+</script>
+</body>
+</html>
