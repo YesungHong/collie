@@ -62,6 +62,7 @@ h2{font-size:16px;margin:4px 0 12px}
 .day h3{font-size:13px;color:var(--muted);margin:0 0 8px;font-weight:600}
 .item{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:8px;font-size:15px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere}
 .item small{display:block;color:var(--muted);font-size:12px;margin-bottom:3px;white-space:normal}
+.banner{background:var(--soft);color:var(--accent);border-radius:14px;padding:14px 16px;margin-bottom:12px;text-align:center;font-size:18px;font-weight:700;word-break:keep-all;overflow-wrap:anywhere}
 .empty{color:var(--muted);text-align:center;padding:40px 10px;line-height:1.6}
 nav{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);
   padding-bottom:env(safe-area-inset-bottom)}
@@ -282,7 +283,7 @@ function keepInputs(fn){
 // ---------- render ----------
 function render(){
   keepInputs(() => {
-    $('main').innerHTML = ui.mode === 'settings' ? viewSettings() : tab === 'do' ? viewDo() : tab === 'memo' ? viewMemo() : viewLog();
+    $('main').innerHTML = ui.mode === 'settings' ? viewSettings() : tab === 'do' ? viewBanner() + viewDo() : tab === 'memo' ? viewMemo() : viewLog();
   });
   document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === tab && ui.mode !== 'settings'));
   renderSync();
@@ -297,6 +298,9 @@ function renderSync(){
   else { txt = base.at ? `저장됨 ${timeOf(base.at)}` : '저장됨'; cls = 'ok'; }
   $('sync').innerHTML = `<span class="dot ${cls}"></span>${esc(txt)}`;
 }
+
+// banner text lives in data.json ("banner"), so it can change without redeploying
+const viewBanner = () => D.banner ? `<div class="banner">${esc(D.banner)}</div>` : '';
 
 function viewDo(){
   if(ui.mode === 'new') return viewNew();
