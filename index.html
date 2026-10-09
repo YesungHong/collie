@@ -62,6 +62,9 @@ h2{font-size:16px;margin:4px 0 12px}
 .day h3{font-size:13px;color:var(--muted);margin:0 0 8px;font-weight:600}
 .item{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:8px;font-size:15px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere}
 .item[data-act]{cursor:pointer}
+.ihead{display:flex;align-items:flex-start;gap:8px;white-space:normal}
+.ihead small{flex:1}
+.trash{font-size:15px;padding:2px 4px;margin:-4px -6px 0 0;opacity:.6}
 .item small{display:block;color:var(--muted);font-size:12px;margin-bottom:3px;white-space:normal}
 .banner{background:var(--soft);color:var(--accent);border-radius:14px;padding:14px 16px;margin-bottom:12px;text-align:center;font-size:18px;font-weight:700;word-break:keep-all;overflow-wrap:anywhere}
 .empty{color:var(--muted);text-align:center;padding:40px 10px;line-height:1.6}
@@ -180,6 +183,9 @@ function apply(d, op){
       break; }
     case 'delMemo':
       d.notes = d.notes.filter(x => x.id !== op.id);
+      break;
+    case 'delPiece':
+      if(t) t.pieces = t.pieces.filter(x => x.id !== op.piece_id);
       break;
   }
   return d;
@@ -423,9 +429,8 @@ function viewLog(){
     const items = d.items.sort((a,b) => b.at.localeCompare(a.at)).map(i => i.key === logUi.edit
       ? `<div class="item stack" style="white-space:normal"><small>${esc(timeOf(i.at))} · ${esc(i.head)}</small>
            <textarea id="editTxt" rows="4" aria-label="기록 고치기">${esc(logUi.text)}</textarea>
-           <div class="btns"><button class="btn" data-act="editCancel">취소</button><button class="btn primary" data-act="editGo">저장</button></div>
-           <div class="links"><button data-act="editDel">지우기</button></div></div>`
-      : `<div class="item" data-act="edit" data-key="${esc(i.key)}"><small>${esc(timeOf(i.at))} · ${esc(i.head)}</small>${esc(i.body)}</div>`).join('');
+           <div class="btns"><button class="btn" data-act="editCancel">취소</button><button class="btn primary" data-act="editGo">저장</button></div></div>`
+      : `<div class="item" data-act="edit" data-key="${esc(i.key)}"><div class="ihead"><small>${esc(timeOf(i.at))} · ${esc(i.head)}</small><button class="trash" data-act="trash" data-key="${esc(i.key)}" aria-label="지우기">🗑</button></div>${esc(i.body)}</div>`).join('');
     return `<div class="day"><h3>${esc(k.slice(5).replace('-','/'))} · 끝낸 조각 ${d.pieces}</h3>${items}</div>`;
   }).join('');
 }
@@ -551,12 +556,22 @@ document.addEventListener('click', e => {
       const ta = $('editTxt'); if(ta){ ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
       break; }
     case 'editCancel': logUi.edit = null; render(); break;
-    case 'editGo': case 'editDel': {
-      const text = b.dataset.act === 'editGo' ? val('editTxt') : '';
-      if(!text && !confirm('이 기록을 정말 지울까요?')) return;
+    case 'editGo': {
+      const text = val('editTxt');
+      if(!text && !confirm('내용을 비우면 이 글이 지워져요. 지울까요?')) return;
       const key = logUi.edit; logUi.edit = null;
       commit(editOp(key, text));
       toast(text ? '고쳤어요' : '지웠어요'); break; }
+    case 'trash': {
+      const [kind, a, c] = b.dataset.key.split('|');
+      const task = kind !== 'n' ? findTask(D, a) : null;
+      if(kind !== 'n' && !task) return;
+      const msg = kind === 'w' ? `'${task.title}' 일을 통째로 지울까요?\n이 일의 조각 기록도 같이 사라져요.`
+                : kind === 'p' ? '이 조각 기록을 정말 지울까요?' : '이 메모를 정말 지울까요?';
+      if(!confirm(msg)) return;
+      logUi.edit = null;
+      commit(kind === 'w' ? {t:'delTask', task_id:a} : kind === 'p' ? {t:'delPiece', task_id:a, piece_id:c} : {t:'delMemo', id:a});
+      toast('지웠어요'); break; }
   }
 });
 // edit draft lives in logUi, so a sync re-render keeps what's being typed
