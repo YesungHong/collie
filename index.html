@@ -187,6 +187,16 @@ function apply(d, op){
     case 'delPiece':
       if(t) t.pieces = t.pieces.filter(x => x.id !== op.piece_id);
       break;
+    // undo of a delete: put the saved copy back where it was, unless it's already there
+    case 'restoreTask':
+      if(!findTask(d, op.task.id)) d.tasks.splice(Math.min(op.index, d.tasks.length), 0, clone(op.task));
+      break;
+    case 'restorePiece':
+      if(t && !t.pieces.some(x => x.id === op.piece.id)) t.pieces.splice(Math.min(op.index, t.pieces.length), 0, clone(op.piece));
+      break;
+    case 'restoreMemo':
+      if(!d.notes.some(x => x.id === op.note.id)) d.notes.splice(Math.min(op.index, d.notes.length), 0, clone(op.note));
+      break;
   }
   return d;
 }
@@ -471,7 +481,11 @@ function toast(msg, actLabel, act){
 }
 
 // ---------- actions ----------
-let lastDoneRef = null;
+let lastDoneRef = null, lastUndoOp = null;
+function restoreTaskOp(id){
+  const i = D.tasks.findIndex(x => x.id === id);
+  return i < 0 ? null : {t:'restoreTask', task:clone(D.tasks[i]), index:i};
+}
 function lines(s){ return s.split('\n').map(x => x.trim()).filter(Boolean); }
 const val = id => ($(id) ? $(id).value.trim() : '');
 function clearKeep(...ids){ ids.forEach(id => { if($(id)) $(id).value = ''; }); }
@@ -535,8 +549,10 @@ document.addEventListener('click', e => {
       toast(`✓ ${t.title}`); break;
     case 'del':
       ui.menu = false;
-      if(confirm(`'${t.title}'을(를) 지울까요? 기록에서도 사라져요.`)) commit({t:'delTask', task_id:t.id});
-      else render();
+      if(confirm(`'${t.title}'을(를) 지울까요? 기록에서도 사라져요.`)){
+        lastUndoOp = restoreTaskOp(t.id); commit({t:'delTask', task_id:t.id});
+        toast('지웠어요', '되돌리기', 'undoDel');
+      } else render();
       break;
     case 'memoGo': {
       const text = val('memoTxt'); if(!text) return;
@@ -560,8 +576,11 @@ document.addEventListener('click', e => {
       const text = val('editTxt');
       if(!text && !confirm('내용을 비우면 이 글이 지워져요. 지울까요?')) return;
       const key = logUi.edit; logUi.edit = null;
+      const before = (Object.values(logDays()).flatMap(d => d.items).find(i => i.key === key) || {}).body;
       commit(editOp(key, text));
-      toast(text ? '고쳤어요' : '지웠어요'); break; }
+      if(text) toast('고쳤어요');
+      else { lastUndoOp = before ? editOp(key, before) : null; toast('지웠어요', lastUndoOp && '되돌리기', 'undoDel'); }
+      break; }
     case 'trash': {
       const [kind, a, c] = b.dataset.key.split('|');
       const task = kind !== 'n' ? findTask(D, a) : null;
@@ -570,8 +589,17 @@ document.addEventListener('click', e => {
                 : kind === 'p' ? '이 조각 기록을 정말 지울까요?' : '이 메모를 정말 지울까요?';
       if(!confirm(msg)) return;
       logUi.edit = null;
-      commit(kind === 'w' ? {t:'delTask', task_id:a} : kind === 'p' ? {t:'delPiece', task_id:a, piece_id:c} : {t:'delMemo', id:a});
-      toast('지웠어요'); break; }
+      if(kind === 'w'){ lastUndoOp = restoreTaskOp(a); commit({t:'delTask', task_id:a}); }
+      else if(kind === 'p'){ const i = task.pieces.findIndex(x => x.id === c);
+        lastUndoOp = i < 0 ? null : {t:'restorePiece', task_id:a, piece:clone(task.pieces[i]), index:i};
+        commit({t:'delPiece', task_id:a, piece_id:c}); }
+      else { const i = D.notes.findIndex(x => x.id === a);
+        lastUndoOp = i < 0 ? null : {t:'restoreMemo', note:clone(D.notes[i]), index:i};
+        commit({t:'delMemo', id:a}); }
+      toast('지웠어요', lastUndoOp && '되돌리기', 'undoDel'); break; }
+    case 'undoDel':
+      if(lastUndoOp){ commit(lastUndoOp); lastUndoOp = null; }
+      $('toast').innerHTML = ''; break;
   }
 });
 // edit draft lives in logUi, so a sync re-render keeps what's being typed
