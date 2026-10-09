@@ -61,6 +61,7 @@ h2{font-size:16px;margin:4px 0 12px}
 .day{margin-bottom:20px}
 .day h3{font-size:13px;color:var(--muted);margin:0 0 8px;font-weight:600}
 .item{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:8px;font-size:15px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere}
+.item[data-act]{cursor:pointer}
 .item small{display:block;color:var(--muted);font-size:12px;margin-bottom:3px;white-space:normal}
 .banner{background:var(--soft);color:var(--accent);border-radius:14px;padding:14px 16px;margin-bottom:12px;text-align:center;font-size:18px;font-weight:700;word-break:keep-all;overflow-wrap:anywhere}
 .empty{color:var(--muted);text-align:center;padding:40px 10px;line-height:1.6}
@@ -165,6 +166,21 @@ function apply(d, op){
     case 'delTask':
       d.tasks = d.tasks.filter(x => x.id !== op.task_id);
       break;
+    // log edits: each sets a final value, so replaying them is harmless
+    case 'editNote': {
+      const p = t && t.pieces.find(x => x.id === op.piece_id);
+      if(p) p.note = op.text || null;
+      break; }
+    case 'editWrap':
+      if(t) t.wrap = op.text ? {at:(t.wrap && t.wrap.at) || t.finished || op.at, text:op.text} : null;
+      break;
+    case 'editMemo': {
+      const n = d.notes.find(x => x.id === op.id);
+      if(n) n.text = op.text;
+      break; }
+    case 'delMemo':
+      d.notes = d.notes.filter(x => x.id !== op.id);
+      break;
   }
   return d;
 }
@@ -249,6 +265,7 @@ document.addEventListener('visibilitychange', () => { if(!document.hidden) sched
 // ---------- UI state (per phone, not synced) ----------
 let tab = 'do';
 let ui = {mode:null, menu:false};                 // mode: null | 'new' | 'add' | 'split' | 'settings'
+let logUi = {week:null, edit:null, text:''};      // log tab: picked week (null = this week), item being edited + its draft
 let undoTimer = null;
 
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -273,11 +290,12 @@ function timerText(p){
 
 // keep typed text across re-renders (sync finishing must not eat a half-written note)
 function keepInputs(fn){
-  const kept = {}, f = document.activeElement && document.activeElement.id;
+  const a = document.activeElement, kept = {}, f = a && a.id;
+  const sel = a && 'selectionStart' in a ? [a.selectionStart, a.selectionEnd] : null;
   document.querySelectorAll('[data-keep]').forEach(el => kept[el.id] = el.value);
   fn();
   for(const id in kept){ const el = $(id); if(el && !el.value) el.value = kept[id]; }
-  if(f && $(f)) $(f).focus();
+  if(f && $(f)){ $(f).focus(); try{ if(sel) $(f).setSelectionRange(sel[0], sel[1]); }catch(e){} }
 }
 
 // ---------- render ----------
@@ -365,28 +383,58 @@ function viewMemo(){
     ${recent.map(n => `<div class="item"><small>${esc(dayOf(n.at).slice(5).replace('-','/'))} ${esc(timeOf(n.at))}</small>${esc(n.text)}</div>`).join('')}`;
 }
 
-function viewLog(){
+// week = Sunday..Saturday (same as the cub weeks); key = Sunday's date
+function weekOf(day){
+  const [y, m, d] = day.split('-').map(Number), dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() - dt.getDay());
+  return `${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}`;
+}
+function weekLabel(w){
+  const [y, m, d] = w.split('-').map(Number), e = new Date(y, m - 1, d + 6);
+  return `${m}/${d} ~ ${e.getMonth()+1}/${e.getDate()}` + (w === weekOf(today()) ? ' · 이번 주' : '');
+}
+function logDays(){
   const days = {};
   const at = (k) => days[k] = days[k] || {pieces:0, items:[]};
   for(const t of D.tasks){
     for(const p of t.pieces) if(p.status === 'done'){
       at(dayOf(p.done_at)).pieces++;
-      if(p.note) at(dayOf(p.done_at)).items.push({at:p.done_at, head:`${t.title} · ${p.text}`, body:p.note});
+      if(p.note) at(dayOf(p.done_at)).items.push({key:`p|${t.id}|${p.id}`, at:p.done_at, head:`${t.title} · ${p.text}`, body:p.note});
     }
     if(t.status === 'done'){
       const when = t.wrap ? t.wrap.at : (t.finished || lastDone(t));
-      if(when) at(dayOf(when)).items.push({at:when, head:`✓ ${t.title} · 조각 ${t.pieces.filter(p => p.status === 'done').length}`, body:t.wrap ? t.wrap.text : ''});
+      if(when) at(dayOf(when)).items.push({key:`w|${t.id}`, at:when, head:`✓ ${t.title} · 조각 ${t.pieces.filter(p => p.status === 'done').length}`, body:t.wrap ? t.wrap.text : ''});
     }
   }
-  for(const n of D.notes) at(dayOf(n.at)).items.push({at:n.at, head:'메모', body:n.text});
-  const keys = Object.keys(days).filter(Boolean).sort().reverse();
-  if(!keys.length) return `<h2>기록</h2><div class="empty">끝낸 조각과 메모가 여기 날짜별로 쌓여요.</div>`;
-  return `<h2>기록</h2>` + keys.map(k => {
+  for(const n of D.notes) at(dayOf(n.at)).items.push({key:`n|${n.id}`, at:n.at, head:'메모', body:n.text});
+  delete days[''];
+  return days;
+}
+function viewLog(){
+  const days = logDays(), cur = weekOf(today());
+  const weeks = [...new Set([cur, ...Object.keys(days).map(weekOf)])].sort().reverse();
+  const w = weeks.includes(logUi.week) ? logUi.week : cur;
+  const opts = weeks.map(x => `<option value="${esc(x)}" ${x === w ? 'selected' : ''}>${esc(weekLabel(x))}</option>`).join('');
+  const keys = Object.keys(days).filter(k => weekOf(k) === w).sort().reverse();
+  let h = `<h2>기록</h2><div class="picker"><select id="weekPick" aria-label="주">${opts}</select></div>`;
+  if(!keys.length) return h + `<div class="empty">끝낸 조각과 메모가 여기 날짜별로 쌓여요.</div>`;
+  return h + keys.map(k => {
     const d = days[k];
-    const items = d.items.sort((a,b) => b.at.localeCompare(a.at)).map(i =>
-      `<div class="item"><small>${esc(timeOf(i.at))} · ${esc(i.head)}</small>${esc(i.body)}</div>`).join('');
+    const items = d.items.sort((a,b) => b.at.localeCompare(a.at)).map(i => i.key === logUi.edit
+      ? `<div class="item stack" style="white-space:normal"><small>${esc(timeOf(i.at))} · ${esc(i.head)}</small>
+           <textarea id="editTxt" rows="4" aria-label="기록 고치기">${esc(logUi.text)}</textarea>
+           <div class="btns"><button class="btn" data-act="editCancel">취소</button><button class="btn primary" data-act="editGo">저장</button></div>
+           <div class="links"><button data-act="editDel">지우기</button></div></div>`
+      : `<div class="item" data-act="edit" data-key="${esc(i.key)}"><small>${esc(timeOf(i.at))} · ${esc(i.head)}</small>${esc(i.body)}</div>`).join('');
     return `<div class="day"><h3>${esc(k.slice(5).replace('-','/'))} · 끝낸 조각 ${d.pieces}</h3>${items}</div>`;
   }).join('');
+}
+// turn a log item key into the op that sets its text ('' = delete)
+function editOp(key, text){
+  const [kind, a, b] = key.split('|');
+  if(kind === 'p') return {t:'editNote', task_id:a, piece_id:b, text:text || null};
+  if(kind === 'w') return {t:'editWrap', task_id:a, text:text || null};
+  return text ? {t:'editMemo', id:a, text} : {t:'delMemo', id:a};
 }
 function lastDone(t){ return t.pieces.map(p => p.done_at).filter(Boolean).sort().pop(); }
 
@@ -425,7 +473,7 @@ function clearKeep(...ids){ ids.forEach(id => { if($(id)) $(id).value = ''; }); 
 
 document.addEventListener('click', e => {
   const tb = e.target.closest('nav button');
-  if(tb){ tab = tb.dataset.tab; ui = {mode:null, menu:false}; render(); window.scrollTo(0,0); return; }
+  if(tb){ tab = tb.dataset.tab; ui = {mode:null, menu:false}; logUi.edit = null; render(); window.scrollTo(0,0); return; }
   if(e.target.closest('#gear')){ ui = {mode: ui.mode === 'settings' ? null : 'settings', menu:false}; render(); return; }
   const b = e.target.closest('[data-act]'); if(!b) return;
   const t = curTask(), p = nextPiece(t);
@@ -496,9 +544,25 @@ document.addEventListener('click', e => {
       syncErr = ''; sync().then(() => { if(ui.mode === 'settings') render(); });
       break;
     case 'closeSet': ui = {mode:null, menu:false}; render(); break;
+    case 'edit': {
+      const it = Object.values(logDays()).flatMap(d => d.items).find(i => i.key === b.dataset.key);
+      if(!it) return;
+      logUi.edit = it.key; logUi.text = it.body || ''; render();
+      const ta = $('editTxt'); if(ta){ ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
+      break; }
+    case 'editCancel': logUi.edit = null; render(); break;
+    case 'editGo': case 'editDel': {
+      const text = b.dataset.act === 'editGo' ? val('editTxt') : '';
+      if(!text && !confirm('이 기록을 정말 지울까요?')) return;
+      const key = logUi.edit; logUi.edit = null;
+      commit(editOp(key, text));
+      toast(text ? '고쳤어요' : '지웠어요'); break; }
   }
 });
+// edit draft lives in logUi, so a sync re-render keeps what's being typed
+document.addEventListener('input', e => { if(e.target.id === 'editTxt') logUi.text = e.target.value; });
 document.addEventListener('change', e => {
+  if(e.target.id === 'weekPick'){ logUi.week = e.target.value; logUi.edit = null; render(); return; }
   if(e.target.id !== 'pick') return;
   if(e.target.value === '__new'){ ui = {mode:'new', menu:false}; }
   else { store.set('collie.cur', e.target.value); ui = {mode:null, menu:false}; }
